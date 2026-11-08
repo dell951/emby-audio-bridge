@@ -1,4 +1,7 @@
+import { DEFAULT_AUDIO_SETTINGS, normalizeAudioSettings } from './settings.js';
+
 const SERVER_KEY = 'servers';
+const AUDIO_SETTINGS_KEY = 'audioSettings';
 const button = document.querySelector('#run');
 const summary = document.querySelector('#summary');
 const results = document.querySelector('#results');
@@ -6,6 +9,32 @@ const serverForm = document.querySelector('#server-form');
 const serverInput = document.querySelector('#server-url');
 const serverStatus = document.querySelector('#server-status');
 const serverList = document.querySelector('#server-list');
+const audioSettingsForm = document.querySelector('#audio-settings-form');
+const audioSettingsStatus = document.querySelector('#audio-settings-status');
+
+function showAudioSettings(settings) {
+  const value = normalizeAudioSettings({...DEFAULT_AUDIO_SETTINGS,...settings});
+  for (const [key, setting] of Object.entries(value)) audioSettingsForm.elements.namedItem(key).value = setting;
+}
+
+chrome.storage.local.get(AUDIO_SETTINGS_KEY).then(({audioSettings}) => showAudioSettings(audioSettings));
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[AUDIO_SETTINGS_KEY]) showAudioSettings(changes[AUDIO_SETTINGS_KEY].newValue);
+});
+
+audioSettingsForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!audioSettingsForm.reportValidity()) return;
+  const values = Object.fromEntries(new FormData(audioSettingsForm));
+  const settings = normalizeAudioSettings(values);
+  try {
+    await chrome.storage.local.set({[AUDIO_SETTINGS_KEY]: settings});
+    showAudioSettings(settings);
+    audioSettingsStatus.textContent = '设置已保存，将立即应用于当前播放和后续播放。';
+  } catch (error) {
+    audioSettingsStatus.textContent = `保存失败：${error.message || error}`;
+  }
+});
 
 function patternFromInput(value) {
   const url = new URL(value.trim());

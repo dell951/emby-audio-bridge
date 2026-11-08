@@ -25,10 +25,28 @@
       <ul id="server-list" aria-label="已配置的 Emby 服务器"></ul>
     </section>
     <section>
+      <h2>音频缓存</h2>
+      <form id="audio-settings-form">
+        <label for="cache-ahead">向前缓存目标（秒）</label>
+        <input id="cache-ahead" name="cacheAheadSeconds" type="number" min="10" max="120" step="5" required>
+        <p class="hint">调高可减少解码落后引起的暂停，但会更早读取更多音频并增加内存占用；调低可减少预读和缓存占用，但网络或解码变慢时更容易等待。</p>
+
+        <label for="cache-behind">保留已播放音频（秒）</label>
+        <input id="cache-behind" name="cacheBehindSeconds" type="number" min="0" max="600" step="30" required>
+        <p class="hint">调高可让回退/重复播放更多时候直接复用已解码音频，减少网络读取等待；调低会更早释放旧音频。过大的值会与向前缓存争用内存上限。</p>
+
+        <label for="cache-memory">PCM 缓存上限（MiB）</label>
+        <input id="cache-memory" name="cacheMaxMiB" type="number" min="32" max="512" step="32" required>
+        <p class="hint">调高可同时保留更长的前后缓存，但扩展会占用更多内存；调低会更早淘汰远离播放位置的音频，回退时可能需要重新读取。PCM 为 48 kHz 双声道浮点音频，96 MiB 理论上约能容纳 4 分钟，实际还受其他缓存和解码器占用影响。</p>
+        <button type="submit">保存缓存设置</button>
+      </form>
+      <p id="audio-settings-status" role="status" aria-live="polite"></p>
+    </section>
+    <section>
       <h2>环境检测</h2>
-    <button id="run" type="button">运行环境检测</button>
-    <p id="summary" role="status" aria-live="polite">尚未检测</p>
-    <ul id="results" aria-label="检测结果"></ul>
+      <button id="run" type="button">运行环境检测</button>
+      <p id="summary" role="status" aria-live="polite">尚未检测</p>
+      <ul id="results" aria-label="检测结果"></ul>
     </section>
     <section>
       <h2>关于 FFmpeg</h2>

@@ -98,9 +98,9 @@ function makeLazyInput(path, originalUrl, resolvedUrl, size, cacheResolved, chun
     xhr.open("GET", u, false);
     xhr.responseType = "arraybuffer";
     xhr.timeout = 15000;
-    self.postMessage({type:"io",data:{state:"request",start,length:end-start+1}});
     xhr.setRequestHeader("Range", `bytes=${start}-${end}`);
     const began=performance.now();
+    self.postMessage({type:"io",data:{state:"request",start,length:end-start+1,requestAt:Date.now()}});
     try { xhr.send(null); } catch(e) { self.postMessage({type:"io",data:{state:"failed",start,elapsedMs:performance.now()-began}}); throw e; }
     self.postMessage({type:"io",data:{state:"response",start,elapsedMs:performance.now()-began,status:xhr.status,bytes:xhr.response?.byteLength}});
     return xhr;

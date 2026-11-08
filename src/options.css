@@ -7,6 +7,7 @@ h1 img { width: 40px; height: 40px; border-radius: 10px; }
 button { padding: 9px 16px; border: 0; border-radius: 6px; background: #1769d2; color: white; font: inherit; cursor: pointer; }
 button:disabled { opacity: .65; cursor: progress; }
 form label { display: block; margin: 12px 0 5px; }
+form input[type="number"] { width: 120px; box-sizing: border-box; padding: 8px 10px; border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; }
 .form-row { display: flex; gap: 8px; }
 .form-row input { flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; }
 .hint { color: GrayText; font-size: .9rem; }
