@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Emby Audio Bridge",
+  "version": "0.1.0",
+  "description": "Local EAC3 audio decoding synchronized to the existing Emby video.",
+  "minimum_chrome_version": "116",
+  "host_permissions": ["https://st.stentvessel.xyz/*"],
+  "content_scripts": [{"matches": ["https://st.stentvessel.xyz/*"], "js": ["src/content.js"], "run_at": "document_idle"}],
+  "web_accessible_resources": [{"resources": ["src/audio.html"], "matches": ["https://st.stentvessel.xyz/*"]}],
+  "content_security_policy": {"extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self' https://st.stentvessel.xyz"}
+}
