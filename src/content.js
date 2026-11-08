@@ -79,8 +79,8 @@
     const host=document.createElement('div');
     const shadow=host.attachShadow({mode:'closed'});
     shadow.innerHTML=`<style>
-      :host{all:initial;display:block;box-sizing:border-box;position:fixed;z-index:2147483647;width:32px;height:32px;font:12px/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#f4f4f4;pointer-events:none;opacity:.48;transition:opacity .18s ease}
-      :host(:hover),:host([data-open="true"]){opacity:.96;visibility:visible}
+      :host{all:initial;display:block;box-sizing:border-box;position:fixed;z-index:2147483647;width:32px;height:32px;font:12px/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#f4f4f4;pointer-events:none;opacity:.28;transition:opacity .18s ease}
+      :host(:hover),:host([data-open="true"]){opacity:.82;visibility:visible}
       :host([data-idle="true"]):not([data-open="true"]){opacity:0;visibility:hidden}
       .wrap{position:absolute;inset:0 auto auto 0;width:32px;display:flex;flex-direction:column;align-items:center;pointer-events:none}
       .badge{position:relative;box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:0;border-radius:0;background:transparent;color:#f5f5f5;box-shadow:none;backdrop-filter:none;cursor:default;pointer-events:auto}
@@ -121,14 +121,20 @@
     const host=s.badge.host;
     const hide=()=>{clearTimeout(s.badge.hideTimer);if(host.dataset.open!=='true')host.dataset.idle='true';};
     const show=()=>{host.dataset.idle='false';clearTimeout(s.badge.hideTimer);s.badge.hideTimer=setTimeout(hide,1800);};
+    const inside=(x,y,r)=>r && r.width>0 && r.height>0 && x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+    const isOverPlayer=(x,y)=>{
+      if (inside(x,y,s.video.getBoundingClientRect())) return true;
+      const element=document.elementFromPoint(x,y);
+      return Boolean(element && (element===host || element.closest?.('.videoOsdHeader, .videoOsdBottom, .videoOsdControls, .videoOsdPositionSlider, .videoOsdVolumeSlider')));
+    };
+    const move=event=>{if(isOverPlayer(event.clientX,event.clientY))show();else hide();};
     const leave=event=>{if(event.relatedTarget==null)hide();};
-    s.badge.activity={hide,show,leave};
-    document.addEventListener('mousemove',show,{passive:true});
-    document.addEventListener('pointerdown',show,{passive:true});
+    s.badge.activity={hide,move,leave};
+    document.addEventListener('mousemove',move,{passive:true});
+    document.addEventListener('pointerdown',move,{passive:true});
     document.addEventListener('mouseout',leave);
     window.addEventListener('blur',hide);
-    window.addEventListener('focus',show);
-    show();
+    hide();
   }
   function close() {
     if (!session) return;
@@ -136,11 +142,10 @@
     for (const name of session.events) session.video.removeEventListener(name, session.send);
     if (session.badge?.activity) {
       clearTimeout(session.badge.hideTimer);
-      document.removeEventListener('mousemove',session.badge.activity.show);
-      document.removeEventListener('pointerdown',session.badge.activity.show);
+      document.removeEventListener('mousemove',session.badge.activity.move);
+      document.removeEventListener('pointerdown',session.badge.activity.move);
       document.removeEventListener('mouseout',session.badge.activity.leave);
       window.removeEventListener('blur',session.badge.activity.hide);
-      window.removeEventListener('focus',session.badge.activity.show);
     }
     session.frame.remove();
     session.badge?.host.remove();
