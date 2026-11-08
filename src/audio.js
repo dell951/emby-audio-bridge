@@ -1,3 +1,4 @@
+import { needsAudioBridge } from './codecs.js';
 import { position, covers } from './clock.js';
 import { DECODE_SECONDS, mustWait, resumeSeconds } from './buffer-policy.js';
 import { AudioCache } from './cache.js';
@@ -74,7 +75,7 @@ async function decode(start, duration = DECODE_SECONDS) {
     }
     if (!worker) await initialize();
     if (generation !== epoch) return;
-    if (codec !== 'eac3' && codec !== 'ac3') { codec = 'unsupported'; cancel(); return; }
+    if (!needsAudioBridge(codec)) { codec = 'unsupported'; cancel(); return; }
     // Initialization may take seconds: begin at the current video position.
     if (!cache.chunks.length && state && !state.paused) start = position(state, performance.timeOrigin + performance.now());
     phase = 'decoding';
@@ -111,7 +112,7 @@ function tick() {
   const remaining=Number.isFinite(state.duration) ? Math.max(0,state.duration-time) : Infinity;
   const required=resumeSeconds(state.rate,remaining);
   const needsWait=!chunk || mustWait({available,buffering:state.buffering,rate:state.rate,remaining});
-  if ((codec==='eac3' || codec==='ac3') && needsWait!==Boolean(state.buffering)) {
+  if (needsAudioBridge(codec) && needsWait!==Boolean(state.buffering)) {
     parent.postMessage({type:'audio-bridge-buffer',wait:needsWait,time:state.time},SITE);
   }
   if (state.buffering || needsWait) {

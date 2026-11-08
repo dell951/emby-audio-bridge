@@ -1,6 +1,6 @@
 # Emby Audio Bridge
 
-Chrome 扩展，为 Emby 网页中无法原生播放的 AC3/EAC3 音轨提供本地解码。保留 Emby 的视频、字幕和播放控件。
+Chrome 扩展，为 Emby 网页中无法原生播放的 AC3/EAC3/DTS 音轨提供本地解码。保留 Emby 的视频、字幕和播放控件。
 
 ## 使用
 
@@ -39,3 +39,5 @@ npm run check
 Range 读取 worker 改编自 [AbsolutePlayer](https://github.com/hiburn8/AbsolutePlayer)，GPL-3.0 许可证保留在 LICENSE 和 vendor/AbsolutePlayer-LICENSE。FFmpeg WASM 文件沿用现有本地包；公开分发前仍需核实其构建来源与对应源码义务。
 
 不要提交服务器登录令牌、浏览器配置或媒体文件。
+
+DTS-HD MA 使用 FFmpeg 的 DTS 解码路径，输出为 48 kHz 立体声，与现有补声格式一致；未承诺无损或 5.1 原样输出。
