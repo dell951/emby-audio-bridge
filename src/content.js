@@ -1,5 +1,14 @@
 (() => {
-  const extensionOrigin = new URL(chrome.runtime.getURL('/')).origin;
+  // Capture extension metadata while the content script context is live.
+  // Existing tabs can keep an old content script briefly after an extension
+  // reload; calling runtime APIs from a timer then throws "context invalidated".
+  let extensionBaseUrl = '';
+  let extensionVersion = 'unknown';
+  try {
+    extensionBaseUrl = chrome.runtime.getURL('/');
+    extensionVersion = chrome.runtime.getManifest().version || extensionVersion;
+  } catch {}
+  const extensionOrigin = extensionBaseUrl ? new URL(extensionBaseUrl).origin : '';
   let session;
   const source = v => v.currentSrc || v.src || v.querySelector('source')?.src;
   const codecName = codec => ({ac3:'AC-3',eac3:'E-AC-3',dts:'DTS',native:'浏览器原生音轨',probing:'探测中'})[codec] || String(codec || '未知');
@@ -47,7 +56,7 @@
     ui.button.classList.toggle('good',Boolean(d.audible && !d.error));
     ui.values.health.textContent=`${health.level}/5 · ${health.label}`;
     ui.values.codec.textContent=codecName(d.codec);
-    ui.values.version.textContent=`v${chrome.runtime.getManifest().version}`;
+    ui.values.version.textContent=`v${extensionVersion}`;
     ui.values.phase.textContent=phaseName(d.phase);
     ui.values.context.textContent=contextName(d.context);
     ui.values.ahead.textContent=`${Number(d.bufferedAhead || 0).toFixed(1)} 秒`;
@@ -147,7 +156,7 @@
     if (!video) return;
     if (session) { positionBadge(session); return; }
     const frame = document.createElement('iframe');
-    frame.src = `${chrome.runtime.getURL('src/audio.html')}?parentOrigin=${encodeURIComponent(location.origin)}`;
+    frame.src = `${new URL('src/audio.html', extensionBaseUrl).href}?parentOrigin=${encodeURIComponent(location.origin)}`;
     frame.allow = 'autoplay';
     frame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0';
     const send = (event) => {
