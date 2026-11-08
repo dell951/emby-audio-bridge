@@ -10,6 +10,8 @@
   } catch {}
   const extensionOrigin = extensionBaseUrl ? new URL(extensionBaseUrl).origin : '';
   let session;
+  let extensionInvalidated=false;
+  let scanTimer;
   const source = v => v.currentSrc || v.src || v.querySelector('source')?.src;
   const codecName = codec => ({ac3:'AC-3',eac3:'E-AC-3',dts:'DTS',native:'浏览器原生音轨',probing:'探测中'})[codec] || String(codec || '未知');
   const phaseName = phase => ({idle:'待命',initializing:'初始化', 'loading-wasm':'加载解码器','mounting-source':'打开媒体','probing-audio':'探测音轨',decoding:'解码中',error:'出错',native:'原生播放'})[phase] || phase || '等待状态';
@@ -40,6 +42,8 @@
     return {level:1,label:d.audible?'缓存耗尽':'音频未就绪'};
   }
   function renderBadge(s) {
+    if (extensionInvalidated || s.dead) return;
+    try {
     const ui=s.badge;
     if (!ui) return;
     const d=s.status || {};
@@ -74,6 +78,19 @@
     const [category,evidence]=diagnose(d);
     ui.values.category.textContent=category;
     ui.values.evidence.textContent=evidence;
+    } catch (error) {
+      if (!/extension context invalidated/i.test(String(error))) throw error;
+      // Chrome can invalidate an old content-script world after an extension
+      // reload. Stop its pollers instead of throwing the same error repeatedly.
+      extensionInvalidated=true;
+      s.dead=true;
+      clearInterval(scanTimer);
+      clearInterval(s.timer);
+      for (const name of s.events) { try { s.video.removeEventListener(name,s.send); } catch {} }
+      try { s.frame.remove(); } catch {}
+      try { s.badge.host.remove(); } catch {}
+      if (session===s) session=undefined;
+    }
   }
   function createBadge() {
     const host=document.createElement('div');
@@ -152,6 +169,7 @@
     session = undefined;
   }
   function scan() {
+    if (extensionInvalidated) return;
     if (!location.hash.includes("/videoosd/")) { close(); return; }
     const video = [...document.querySelectorAll('video')].find(v => {
       try { const u = new URL(source(v)); return u.origin === location.origin && /\.mkv(?:\?|$)/i.test(u.href); } catch { return false; }
@@ -214,5 +232,5 @@
   window.addEventListener('resize', () => positionBadge());
   window.addEventListener('scroll', () => positionBadge(), true);
   document.addEventListener('fullscreenchange', () => positionBadge());
-  setInterval(scan, 500);
+  scanTimer=setInterval(scan, 500);
 })();
