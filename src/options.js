@@ -14,7 +14,11 @@ const audioSettingsStatus = document.querySelector('#audio-settings-status');
 
 function showAudioSettings(settings) {
   const value = normalizeAudioSettings({...DEFAULT_AUDIO_SETTINGS,...settings});
-  for (const [key, setting] of Object.entries(value)) audioSettingsForm.elements.namedItem(key).value = setting;
+  for (const [key, setting] of Object.entries(value)) {
+    const control=audioSettingsForm.elements.namedItem(key);
+    if (control.type==='checkbox') control.checked=setting;
+    else control.value=setting;
+  }
 }
 
 chrome.storage.local.get(AUDIO_SETTINGS_KEY).then(({audioSettings}) => showAudioSettings(audioSettings));
@@ -26,6 +30,7 @@ audioSettingsForm.addEventListener('submit', async event => {
   event.preventDefault();
   if (!audioSettingsForm.reportValidity()) return;
   const values = Object.fromEntries(new FormData(audioSettingsForm));
+  values.showStatusBar=audioSettingsForm.elements.namedItem('showStatusBar').checked;
   const settings = normalizeAudioSettings(values);
   try {
     await chrome.storage.local.set({[AUDIO_SETTINGS_KEY]: settings});

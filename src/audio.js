@@ -21,6 +21,8 @@ let input, size, codec, sourceURL, lastMessage = 0;
 let nextId = 0;
 let pcmSink;
 let io, lastError, decoderError;
+let retryAttempt=0, retryAt=0;
+const RETRY_DELAYS_MS=[5000,10000,20000,40000,60000];
 let networkMs=0, lastJobNetworkMs=0, lastJobOtherMs=0;
 let phase = 'idle', fetched = 0, lastDecodeMs = 0, lastWorkerLog = '', decodeStart = 0, decodeDuration = DECODE_SECONDS, pcmSeconds = 0;
 let lastStatusPost = 0;
@@ -39,6 +41,17 @@ function rpc(type, data) {
   });
 }
 function silence() { timeline?.stop(); }
+function scheduleRetry() {
+  const delay=RETRY_DELAYS_MS[Math.min(retryAttempt,RETRY_DELAYS_MS.length-1)];
+  retryAttempt=Math.min(retryAttempt+1,RETRY_DELAYS_MS.length-1);
+  retryAt=Date.now()+delay;
+}
+function isRetryableFailure(error) {
+  const text=`${error || ''} ${decoderError || ''}`.toLowerCase();
+  return io?.state==='timeout' || io?.state==='failed' ||
+    (Number(io?.status)>=500 || Number(io?.status)===408 || Number(io?.status)===429) ||
+    /network|fetch|xhr|range|timeout|http 5\d\d|eio|aborted/i.test(text);
+}
 function cancel(full = true) {
   ++epoch;
   silence();
@@ -127,9 +140,12 @@ async function decode(start, duration = DECODE_SECONDS) {
     const result = await rpc('stream', {args:['-hide_banner','-loglevel','error','-ss',String(start),'-analyzeduration','100000','-probesize','262144','-i',input,'-t',String(duration),'-map','0:a:0','-vn','-sn','-ac','2','-ar','48000','-c:a','pcm_f32le','-f','f32le','-y','/audio.pcm'],outPath:'/audio.pcm',pcm:true});
     if (result.ret !== 0) throw new Error(decoderError || `FFmpeg exited with code ${result.ret}`);
     if (generation === epoch) { pcmSink = undefined; lastError=undefined; }
+    if (generation === epoch) { retryAttempt=0; retryAt=0; }
   } catch (error) {
     if (generation === epoch) {
+      const retryable=isRetryableFailure(error);
       lastError=safeErrorMessage(error); cancel(); phase='error';
+      if (retryable) scheduleRetry(); else retryAt=0;
       console.warn('Audio Bridge: audio unavailable; native video retained:', lastError);
     }
   } finally {
@@ -144,17 +160,22 @@ async function decode(start, duration = DECODE_SECONDS) {
 }
 function tick() {
   if (!state || Date.now() - lastMessage > 500) { silence(); return; }
-  if (state.paused || state.seeking) { silence(); return; }
-  if (codec === 'unsupported') return;
   if (busy && io?.state==='request' && io.requestAt && Date.now()-io.requestAt>RANGE_STALL_MS) {
     const elapsedMs=Date.now()-io.requestAt;
     io={...io,state:'timeout',elapsedMs};
     lastError=`媒体 Range 请求 ${Math.round(elapsedMs/1000)} 秒无响应，已停止解码并保持视频暂停。`;
     cancel();
     phase='error';
+    scheduleRetry();
     return;
   }
-  if (phase==='error') { silence(); return; }
+  if (state.paused || state.seeking) { silence(); return; }
+  if (codec === 'unsupported') return;
+  if (phase==='error') {
+    silence();
+    if (!retryAt || Date.now()<retryAt) return;
+    phase='idle'; retryAt=0; lastError=undefined; io=undefined;
+  }
   const time = position(state, performance.timeOrigin + performance.now());
   cache.prune(time);
   const chunks = cache.chunks;
@@ -189,10 +210,10 @@ window.addEventListener('message', ({origin,source,data}) => {
   } catch { return; }
   if (!Number.isFinite(data.time) || !Number.isFinite(data.rate) || data.rate <= 0) return;
   if (!context) { context=new AudioContext(); gain=context.createGain(); gain.connect(context.destination); timeline=new AudioTimeline(context,gain); }
-  if (sourceURL !== data.url) { cancel(); sourceURL=data.url; codec=undefined; size=undefined; lastError=undefined; decoderError=undefined; phase='idle'; fetched=0; }
+  if (sourceURL !== data.url) { cancel(); sourceURL=data.url; codec=undefined; size=undefined; lastError=undefined; decoderError=undefined; phase='idle'; fetched=0; retryAttempt=0; retryAt=0; }
     if ((data.seeking && !state?.seeking) || (state && Math.abs(data.time-position(state,data.stamp)) > .5)) {
       cancel(false);
-      if (phase==='error') { phase='idle'; lastError=undefined; io=undefined; }
+      if (phase==='error') { phase='idle'; lastError=undefined; io=undefined; retryAttempt=0; retryAt=0; }
     }
   state=data; lastMessage=Date.now();
   if (data.paused || data.seeking) silence();
@@ -213,7 +234,7 @@ function publishStatus() {
     context:context?.state || 'uninitialized', decoding:busy,
     audible:Boolean(context?.state==='running' && timeline?.active),
     paused:Boolean(state.paused), buffering:Boolean(state.buffering),
-    held:Boolean(state.held), videoPaused:Boolean(state.videoPaused),
+    held:Boolean(state.held), videoPaused:Boolean(state.videoPaused), retryInMs:Math.max(0,retryAt-Date.now()),
     bufferedAhead:Math.max(0,cache.frontier(time)-time),
     bufferedBehind:starts.length?Math.max(0,time-Math.min(...starts)):0,
     fetched, lastDecodeMs, lastJobNetworkMs, lastJobOtherMs, error:lastError || '',

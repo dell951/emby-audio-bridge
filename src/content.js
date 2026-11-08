@@ -12,6 +12,18 @@
   let session;
   let extensionInvalidated=false;
   let scanTimer;
+  let showStatusBar=true;
+  try {
+    chrome.storage.local.get('audioSettings').then(({audioSettings})=>{
+      showStatusBar=audioSettings?.showStatusBar!==false;
+      if (session?.badge?.host) session.badge.host.style.display=showStatusBar?'':'none';
+    }).catch(()=>{});
+    chrome.storage.onChanged.addListener((changes,area)=>{
+      if (area!=='local' || !changes.audioSettings) return;
+      showStatusBar=changes.audioSettings.newValue?.showStatusBar!==false;
+      if (session?.badge?.host) session.badge.host.style.display=showStatusBar?'':'none';
+    });
+  } catch {}
   const source = v => v.currentSrc || v.src || v.querySelector('source')?.src;
   const codecName = codec => ({ac3:'AC-3',eac3:'E-AC-3',dts:'DTS',native:'浏览器原生音轨',probing:'探测中'})[codec] || String(codec || '未知');
   const phaseName = phase => ({idle:'待命',initializing:'初始化', 'loading-wasm':'加载解码器','mounting-source':'打开媒体','probing-audio':'探测音轨',decoding:'解码中',error:'出错',native:'原生播放'})[phase] || phase || '等待状态';
@@ -50,7 +62,7 @@
     const d=s.status || {};
     // Keep the badge visible for the entire video session so probe stalls and
     // native-vs-bridge decisions remain visible to the user.
-    ui.host.hidden=false;
+    ui.host.style.display=showStatusBar?'':'none';
     const label=d.error ? '解码异常' : d.codec==='probing' ? '音轨探测中' : d.codec==='native' ? '原生音频' : d.paused ? '已暂停' : d.buffering ? '等待音频' : d.audible ? '音频正常' : d.decoding ? '正在解码' : '音频启动中';
     ui.label.textContent=label;
     const health=audioHealth(d);
@@ -65,6 +77,7 @@
     ui.values.phase.textContent=phaseName(d.phase);
     ui.values.context.textContent=contextName(d.context);
     ui.values.sync.textContent=d.held?'等待音频，视频已暂停':d.videoPaused?'视频已暂停':'音视频同步播放';
+    ui.values.retry.textContent=Number(d.retryInMs)>0?(d.paused?'恢复播放后立即重试':`${Math.ceil(d.retryInMs/1000)} 秒后重试`):'未计划';
     ui.values.ahead.textContent=`${Number(d.bufferedAhead || 0).toFixed(1)} 秒`;
     ui.values.behind.textContent=`${Number(d.bufferedBehind || 0).toFixed(1)} 秒`;
     ui.values.decode.textContent=`${Number(d.lastDecodeMs || 0).toFixed(0)} 毫秒`;
@@ -108,7 +121,7 @@
       .panel{display:none;width:min(340px,calc(100vw - 24px));max-height:min(70vh,560px);overflow:auto;margin-top:7px;padding:12px;border:1px solid #ffffff24;border-radius:10px;background:#202126ed;box-shadow:0 6px 24px #0007;backdrop-filter:blur(12px);pointer-events:auto}
       :host(:hover) .panel,:host([data-open="true"]) .panel{display:block}
       .title{margin:0 0 4px;font-size:13px;font-weight:700}.title [data-v="version"]{margin-left:4px;color:#aaa;font-size:10px;font-weight:500}.hint{margin:0 0 8px;color:#bbb;font-size:11px}.diagnosis{margin:0 0 8px;padding:8px;border-radius:7px;background:#3a3425}.evidence{color:#eee;font-size:11px;line-height:1.45;overflow-wrap:anywhere}.row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:#ddd;border-bottom:1px solid #ffffff12}.row b{color:#fff;font-weight:500;text-align:right;max-width:220px;overflow-wrap:anywhere}.section{margin:10px 0 4px;color:#b6c5d9;font-size:11px;font-weight:700;text-transform:uppercase}.log{margin:0;padding:7px;border-radius:6px;background:#111318;color:#d8d8d8;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.4 ui-monospace,monospace}.error{margin:8px 0 0;padding:7px;border-radius:6px;background:#712f35;color:#ffe2df;overflow-wrap:anywhere}
-    </style><div class="wrap"><button class="badge" type="button" aria-expanded="false"><span class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="label">音频桥接</span></button><div class="panel"><p class="title">音频解码调试 <span data-v="version"></span></p><p class="hint">5 绿：前方缓存 ≥20 秒；4 绿：≥10 秒；3 黄：≥4 秒；2 橙：缓存偏低；1 红：探测或异常。状态每 0.5 秒刷新；点击徽标固定窗口。</p><div class="diagnosis"><div class="row"><span>初步归因</span><b data-v="category"></b></div><div class="evidence" data-v="evidence"></div></div><div class="row"><span>当前状态</span><b data-v="health"></b></div><div class="row"><span>音轨</span><b data-v="codec"></b></div><div class="row"><span>阶段</span><b data-v="phase"></b></div><div class="row"><span>音频输出</span><b data-v="context"></b></div><div class="row"><span>视频同步</span><b data-v="sync"></b></div><div class="row"><span>视频时间</span><b data-v="time"></b></div><div class="row"><span>本次解码</span><b data-v="range"></b></div><div class="row"><span>PCM 已产出 / 缓存段</span><b data-v="pcm"></b></div><div class="row"><span>前方已缓存</span><b data-v="ahead"></b></div><div class="row"><span>已播放缓存</span><b data-v="behind"></b></div><div class="row"><span>最近解码耗时</span><b data-v="decode"></b></div><div class="row"><span>媒体读取量</span><b data-v="fetched"></b></div><div class="row"><span>最近 Range 请求</span><b data-v="io"></b></div><div class="row"><span>最近任务耗时</span><b data-v="work"></b></div><p class="section">解码器最近日志</p><pre class="log" data-v="log"></pre><p class="error" data-v="error" hidden></p></div></div>`;
+    </style><div class="wrap"><button class="badge" type="button" aria-expanded="false"><span class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="label">音频桥接</span></button><div class="panel"><p class="title">音频解码调试 <span data-v="version"></span></p><p class="hint">5 绿：前方缓存 ≥20 秒；4 绿：≥10 秒；3 黄：≥4 秒；2 橙：缓存偏低；1 红：探测或异常。状态每 0.5 秒刷新；点击徽标固定窗口。</p><div class="diagnosis"><div class="row"><span>初步归因</span><b data-v="category"></b></div><div class="evidence" data-v="evidence"></div></div><div class="row"><span>当前状态</span><b data-v="health"></b></div><div class="row"><span>音轨</span><b data-v="codec"></b></div><div class="row"><span>阶段</span><b data-v="phase"></b></div><div class="row"><span>音频输出</span><b data-v="context"></b></div><div class="row"><span>视频同步</span><b data-v="sync"></b></div><div class="row"><span>自动重试</span><b data-v="retry"></b></div><div class="row"><span>视频时间</span><b data-v="time"></b></div><div class="row"><span>本次解码</span><b data-v="range"></b></div><div class="row"><span>PCM 已产出 / 缓存段</span><b data-v="pcm"></b></div><div class="row"><span>前方已缓存</span><b data-v="ahead"></b></div><div class="row"><span>已播放缓存</span><b data-v="behind"></b></div><div class="row"><span>最近解码耗时</span><b data-v="decode"></b></div><div class="row"><span>媒体读取量</span><b data-v="fetched"></b></div><div class="row"><span>最近 Range 请求</span><b data-v="io"></b></div><div class="row"><span>最近任务耗时</span><b data-v="work"></b></div><p class="section">解码器最近日志</p><pre class="log" data-v="log"></pre><p class="error" data-v="error" hidden></p></div></div>`;
     const badge=shadow.querySelector('.badge');
     const values=Object.fromEntries([...shadow.querySelectorAll('[data-v]')].map(node=>[node.dataset.v,node]));
     const button=shadow.querySelector('.badge');
@@ -225,7 +238,7 @@
     }
     if (data?.type==='audio-bridge-status') {
       const d=data.status || {};
-      s.status={codec:String(d.codec||'probing').slice(0,24),phase:String(d.phase||'idle').slice(0,32),context:String(d.context||'unknown').slice(0,24),decoding:Boolean(d.decoding),audible:Boolean(d.audible),paused:Boolean(d.paused),buffering:Boolean(d.buffering),held:Boolean(d.held),videoPaused:Boolean(d.videoPaused),bufferedAhead:Number(d.bufferedAhead)||0,bufferedBehind:Number(d.bufferedBehind)||0,lastDecodeMs:Number(d.lastDecodeMs)||0,fetched:Number(d.fetched)||0,error:String(d.error||'').slice(0,180),mediaTime:Number(d.mediaTime)||0,decodeStart:Number(d.decodeStart)||0,decodeDuration:Number(d.decodeDuration)||0,pcmSeconds:Number(d.pcmSeconds)||0,cacheChunks:Number(d.cacheChunks)||0,lastJobNetworkMs:Number(d.lastJobNetworkMs)||0,lastJobOtherMs:Number(d.lastJobOtherMs)||0,io:d.io||null,workerLog:String(d.workerLog||'').slice(0,220)};
+      s.status={codec:String(d.codec||'probing').slice(0,24),phase:String(d.phase||'idle').slice(0,32),context:String(d.context||'unknown').slice(0,24),decoding:Boolean(d.decoding),audible:Boolean(d.audible),paused:Boolean(d.paused),buffering:Boolean(d.buffering),held:Boolean(d.held),videoPaused:Boolean(d.videoPaused),retryInMs:Number(d.retryInMs)||0,bufferedAhead:Number(d.bufferedAhead)||0,bufferedBehind:Number(d.bufferedBehind)||0,lastDecodeMs:Number(d.lastDecodeMs)||0,fetched:Number(d.fetched)||0,error:String(d.error||'').slice(0,180),mediaTime:Number(d.mediaTime)||0,decodeStart:Number(d.decodeStart)||0,decodeDuration:Number(d.decodeDuration)||0,pcmSeconds:Number(d.pcmSeconds)||0,cacheChunks:Number(d.cacheChunks)||0,lastJobNetworkMs:Number(d.lastJobNetworkMs)||0,lastJobOtherMs:Number(d.lastJobOtherMs)||0,io:d.io||null,workerLog:String(d.workerLog||'').slice(0,220)};
       renderBadge(s);
       return;
     }

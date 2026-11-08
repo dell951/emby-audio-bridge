@@ -38,7 +38,11 @@
         <label for="cache-memory">PCM 缓存上限（MiB）</label>
         <input id="cache-memory" name="cacheMaxMiB" type="number" min="32" max="512" step="32" required>
         <p class="hint">调高可同时保留更长的前后缓存，但扩展会占用更多内存；调低会更早淘汰远离播放位置的音频，回退时可能需要重新读取。PCM 为 48 kHz 双声道浮点音频，96 MiB 理论上约能容纳 4 分钟，实际还受其他缓存和解码器占用影响。</p>
-        <button type="submit">保存缓存设置</button>
+
+        <label class="setting-toggle"><input id="show-status-bar" name="showStatusBar" type="checkbox">显示播放状态栏</label>
+        <p class="hint">关闭后只隐藏播放器上的状态徽标和调试窗口；音频解码、缓冲等待与视频同步仍会继续运行。</p>
+        <p class="hint">网络或 Range 读取错误会自动无限重试：间隔依次为 5、10、20、40 秒，之后每 60 秒一次。等待期间视频保持暂停；恢复并缓存好音频后继续播放。</p>
+        <button type="submit">保存设置</button>
       </form>
       <p id="audio-settings-status" role="status" aria-live="polite"></p>
     </section>

@@ -8,6 +8,8 @@ button { padding: 9px 16px; border: 0; border-radius: 6px; background: #1769d2; 
 button:disabled { opacity: .65; cursor: progress; }
 form label { display: block; margin: 12px 0 5px; }
 form input[type="number"] { width: 120px; box-sizing: border-box; padding: 8px 10px; border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; }
+.setting-toggle { display: flex; align-items: center; gap: 9px; margin-top: 20px; }
+.setting-toggle input { width: 18px; height: 18px; margin: 0; accent-color: #1769d2; }
 .form-row { display: flex; gap: 8px; }
 .form-row input { flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; }
 .hint { color: GrayText; font-size: .9rem; }
