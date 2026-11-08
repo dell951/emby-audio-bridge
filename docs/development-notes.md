@@ -4,9 +4,9 @@ Independent experimental Chrome extension. Keeps Emby's video element and contro
 
 ## Status
 
-Prototype loaded in Chrome and initially tested in the logged-in Emby session on 2026-11-08. EAC3 decoding, active Web Audio output, pause silence and backward-seek recovery were observed using decoder diagnostics. Forward seek retained native video playback. Seek recovery took several seconds. Subjective lip-sync and actual progress-bar dragging are not yet verified. Navigation cleanup needs retesting: playback was cleared with a page refresh; a subsequent route guard change has not yet been reloaded in Chrome. Do not run alongside AbsolutePlayer: it replaces the video this extension needs to observe. No assertion of working random seek or continuous synchronization is made yet.
+Prototype loaded in Chrome and tested in the logged-in Emby session on 2026-11-08. EAC3 and DTS decoding, active Web Audio output, pause silence, seek recovery and navigation cleanup were observed. Subjective lip-sync and actual progress-bar dragging are not fully verified. Do not run alongside AbsolutePlayer: it replaces the video this extension needs to observe. No assertion of full-movie continuous synchronization is made yet.
 
-Current constraints: direct same-origin `.mkv` URLs, HTTP Range support, first audio stream only. Emby audio-track switching is not implemented; multiple-track files are not supported for acceptance testing. Blob/MSE sources and cross-origin redirects are not supported. Chrome autoplay policy may suspend the hidden audio context. Actual MKV timestamp accuracy, decoder throughput and gap-free playback at chunk boundaries require browser validation. The video continues while audio buffers, so a slow decoder may cause silent gaps.
+Current constraints: configured same-origin `.mkv` URLs, HTTP Range support, first audio stream only. Emby audio-track switching is not implemented. Blob/MSE sources and cross-origin redirects are not supported. Chrome autoplay policy may suspend the hidden audio context. Actual MKV timestamp accuracy, decoder throughput and gap-free playback at chunk boundaries require browser validation. The synchronization-first policy pauses video while audio buffers.
 
 ## Development
 
@@ -17,7 +17,7 @@ From this directory:
 - `npm test` — playback-clock unit tests.
 - `npm run check` — JavaScript syntax checks.
 
-Load this directory as an unpacked extension at `chrome://extensions`. Disable the older AbsolutePlayer extension first, then reload the Emby page. No build step is needed. Only `https://st.stentvessel.xyz` is allowed. Credentials are sent only as part of requests to that origin and never logged intentionally.
+Load this directory as an unpacked extension at `chrome://extensions`. Open the extension options and add each Emby server, then grant the host permission when Chrome prompts. The extension registers its content script only for configured hosts and restores registrations when the options page opens. Permission patterns are optional in the manifest; the page asks for the selected scheme and hostname instead of requesting access to all sites. Chrome host matching ignores ports, so a grant covers all ports on that hostname for the selected scheme. Credentials are sent only in requests to the configured Emby origin and are not intentionally logged.
 
 ## Structure
 
@@ -58,3 +58,9 @@ Chrome observations after reload: at video 1259.3589, audio output was active an
 ### DTS support (v0.2.0)
 
 DTS now shares the AC3/EAC3 buffering and synchronization path. The actual bundled WASM decoded one second from the local DTS fixture into 384000 bytes of 48 kHz stereo float PCM (exit 0). Fifteen tests and syntax checks passed. Chrome testing on the user's DTS-HD MA 5.1 / 96 kHz MKV source reported codec dts, decoding active, 40 cached PCM chunks, and scheduled audio output. The user confirmed hearing sound. This verifies playback, not lossless HD-layer fidelity or 5.1 passthrough; output remains 48 kHz stereo.
+
+### Generic Emby server configuration (v0.4.0)
+
+Removed the fixed site match and required host permission from `manifest.json`. The options page now requests optional host access after the user enters an Emby URL, stores the selected site patterns, and registers `src/content.js` dynamically with `chrome.scripting`. Removing a server unregisters its script and revokes its host permission. Persisted registrations are restored when options are opened. URL paths and ports are normalized to scheme plus hostname because Chrome match patterns apply to all ports and paths on a hostname. The audio iframe validates messages against the active media URL's origin rather than a compile-time site constant. The extension CSP permits HTTP(S) connections; actual network access remains gated by per-host grants. The environment check now reports configured server permission and can restore its script registration.
+
+Added extension artwork as SVG source plus 16/32/48/128 px PNGs. Static checks verified JavaScript syntax, manifest JSON, absence of static `content_scripts`, and diff whitespace. This generic configuration has not yet been acceptance-tested in Chrome against a newly configured second Emby host.

@@ -3,7 +3,7 @@ import { position, covers } from './clock.js';
 import { DECODE_SECONDS, mustWait, resumeSeconds } from './buffer-policy.js';
 import { AudioCache } from './cache.js';
 import { AudioTimeline } from './timeline.js';
-const SITE = 'https://st.stentvessel.xyz';
+let siteOrigin;
 let state, worker, context, gain, timeline, busy = false, epoch = 0;
 const cache = new AudioCache();
 let input, size, codec, sourceURL, lastMessage = 0;
@@ -113,7 +113,7 @@ function tick() {
   const required=resumeSeconds(state.rate,remaining);
   const needsWait=!chunk || mustWait({available,buffering:state.buffering,rate:state.rate,remaining});
   if (needsAudioBridge(codec) && needsWait!==Boolean(state.buffering)) {
-    parent.postMessage({type:'audio-bridge-buffer',wait:needsWait,time:state.time},SITE);
+    if (siteOrigin) parent.postMessage({type:'audio-bridge-buffer',wait:needsWait,time:state.time},siteOrigin);
   }
   if (state.buffering || needsWait) {
     silence();
@@ -129,8 +129,11 @@ function tick() {
   }
 }
 window.addEventListener('message', ({origin,source,data}) => {
-  if (origin !== SITE || source !== parent || data?.type !== 'audio-bridge-state') return;
-  try { if (new URL(data.url).origin !== SITE) return; } catch { return; }
+  if (source !== parent || data?.type !== 'audio-bridge-state') return;
+  try {
+    if (new URL(data.url).origin !== origin || (siteOrigin && siteOrigin !== origin)) return;
+    siteOrigin = origin;
+  } catch { return; }
   if (!Number.isFinite(data.time) || !Number.isFinite(data.rate) || data.rate <= 0) return;
   if (!context) { context=new AudioContext(); gain=context.createGain(); gain.connect(context.destination); timeline=new AudioTimeline(context,gain); }
   if (sourceURL !== data.url) { cancel(); sourceURL=data.url; codec=undefined; size=undefined; }

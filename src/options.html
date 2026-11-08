@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emby Audio Bridge 设置</title>
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body>
+  <main>
+    <h1><img src="../assets/icon48.png" alt="">Emby Audio Bridge</h1>
+    <p class="intro">添加 Emby 服务器后，本扩展只会在你授权的服务器上运行。</p>
+    <section>
+      <h2>Emby 服务器</h2>
+      <form id="server-form">
+        <label for="server-url">服务器网址</label>
+        <div class="form-row">
+          <input id="server-url" type="url" placeholder="https://emby.example.com:8096" required>
+          <button type="submit">添加并授权</button>
+        </div>
+      </form>
+      <p class="hint">可填写带端口或路径的网址；扩展会按该域名匹配。Chrome 将请求此站点的访问权限。</p>
+      <p id="server-status" role="status" aria-live="polite"></p>
+      <ul id="server-list" aria-label="已配置的 Emby 服务器"></ul>
+    </section>
+    <section>
+      <h2>环境检测</h2>
+    <button id="run" type="button">运行环境检测</button>
+    <p id="summary" role="status" aria-live="polite">尚未检测</p>
+    <ul id="results" aria-label="检测结果"></ul>
+    </section>
+    <section>
+      <h2>关于 FFmpeg</h2>
+      <p>FFmpeg WebAssembly 已包含在扩展内，不需要单独安装 FFmpeg。若“内置 FFmpeg 解码器”失败，请在 <code>chrome://extensions</code> 中确认扩展已启用，并从扩展所在的完整文件夹重新加载。</p>
+      <p>添加服务器或检测通过后，请刷新 Emby 播放页面。检测无法识别 macOS 系统静音、耳机输出选择或显示器音量。</p>
+    </section>
+  </main>
+</body>
+</html>

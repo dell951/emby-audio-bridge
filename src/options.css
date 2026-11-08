@@ -1,0 +1,24 @@
+:root { color-scheme: light dark; font: 15px/1.55 system-ui, sans-serif; }
+body { margin: 0; background: Canvas; color: CanvasText; }
+main { max-width: 720px; margin: 48px auto; padding: 0 24px; }
+h1 { display: flex; align-items: center; gap: 12px; font-size: 1.6rem; }
+h1 img { width: 40px; height: 40px; border-radius: 10px; }
+.intro { color: GrayText; }
+button { padding: 9px 16px; border: 0; border-radius: 6px; background: #1769d2; color: white; font: inherit; cursor: pointer; }
+button:disabled { opacity: .65; cursor: progress; }
+form label { display: block; margin: 12px 0 5px; }
+.form-row { display: flex; gap: 8px; }
+.form-row input { flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); border-radius: 6px; background: Canvas; color: CanvasText; font: inherit; }
+.hint { color: GrayText; font-size: .9rem; }
+#server-status { min-height: 1.5em; }
+.server-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+button.secondary { padding: 5px 10px; background: transparent; color: CanvasText; border: 1px solid color-mix(in srgb, CanvasText 24%, Canvas); }
+#summary { font-weight: 650; margin: 22px 0 8px; }
+ul { padding: 0; list-style: none; }
+li { padding: 10px 12px; margin: 7px 0; border-radius: 6px; background: color-mix(in srgb, CanvasText 6%, Canvas); }
+li[data-state="pass"]::before { content: "✓  "; color: #188038; }
+li[data-state="fail"]::before { content: "✗  "; color: #d93025; }
+li[data-state="info"]::before { content: "•  "; color: #777; }
+section { margin-top: 30px; padding-top: 15px; border-top: 1px solid color-mix(in srgb, CanvasText 18%, Canvas); }
+h2 { font-size: 1.1rem; }
+code { font-family: ui-monospace, monospace; }

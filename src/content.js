@@ -1,5 +1,5 @@
 (() => {
-  const origin = new URL(chrome.runtime.getURL('/')).origin;
+  const extensionOrigin = new URL(chrome.runtime.getURL('/')).origin;
   let session;
   const source = v => v.currentSrc || v.src || v.querySelector('source')?.src;
   function close() {
@@ -31,7 +31,7 @@
       frame.contentWindow?.postMessage({type:'audio-bridge-state', url,
         time:video.currentTime, duration:video.duration, buffering:session.buffering, paused:!session.wanted || video.ended || video.seeking || (!session.buffering && video.readyState < 3),
         rate:video.playbackRate, volume:video.muted ? 0 : video.volume,
-        seeking:video.seeking, stamp:performance.timeOrigin + performance.now()}, origin);
+        seeking:video.seeking, stamp:performance.timeOrigin + performance.now()}, extensionOrigin);
     };
     const events = ['play','pause','seeking','seeked','waiting','playing','ended','emptied','ratechange','volumechange'];
     session = {video, url, frame, send, events, wanted:!video.paused, buffering:false, internalPause:false, timer:setInterval(send, 100)};
@@ -41,7 +41,7 @@
   }
   window.addEventListener('message', ({origin:from,source:sender,data}) => {
     const s=session;
-    if (!s || from!==origin || sender!==s.frame.contentWindow || data?.type!=='audio-bridge-buffer') return;
+    if (!s || from!==extensionOrigin || sender!==s.frame.contentWindow || data?.type!=='audio-bridge-buffer') return;
     if (Math.abs(s.video.currentTime-data.time)>.25 || source(s.video)!==s.url) return;
     s.buffering=Boolean(data.wait);
     if (s.buffering && !s.video.paused) { s.internalPause=true; s.video.pause(); }
