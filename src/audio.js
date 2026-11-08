@@ -8,6 +8,7 @@ let siteOrigin;
 const expectedParentOrigin = new URLSearchParams(location.search).get('parentOrigin');
 let state, worker, context, gain, timeline, busy = false, epoch = 0;
 const cache = new AudioCache();
+const RANGE_STALL_MS = 20000;
 function applyAudioSettings(raw) {
   const settings = normalizeAudioSettings(raw);
   cache.configure({behind:settings.cacheBehindSeconds,ahead:settings.cacheAheadSeconds,maxBytes:settings.cacheMaxMiB*1024*1024});
@@ -145,6 +146,15 @@ function tick() {
   if (!state || Date.now() - lastMessage > 500) { silence(); return; }
   if (state.paused || state.seeking) { silence(); return; }
   if (codec === 'unsupported') return;
+  if (busy && io?.state==='request' && io.requestAt && Date.now()-io.requestAt>RANGE_STALL_MS) {
+    const elapsedMs=Date.now()-io.requestAt;
+    io={...io,state:'timeout',elapsedMs};
+    lastError=`媒体 Range 请求 ${Math.round(elapsedMs/1000)} 秒无响应，已停止解码并保持视频暂停。`;
+    cancel();
+    phase='error';
+    return;
+  }
+  if (phase==='error') { silence(); return; }
   const time = position(state, performance.timeOrigin + performance.now());
   cache.prune(time);
   const chunks = cache.chunks;
@@ -180,7 +190,10 @@ window.addEventListener('message', ({origin,source,data}) => {
   if (!Number.isFinite(data.time) || !Number.isFinite(data.rate) || data.rate <= 0) return;
   if (!context) { context=new AudioContext(); gain=context.createGain(); gain.connect(context.destination); timeline=new AudioTimeline(context,gain); }
   if (sourceURL !== data.url) { cancel(); sourceURL=data.url; codec=undefined; size=undefined; lastError=undefined; decoderError=undefined; phase='idle'; fetched=0; }
-  if ((data.seeking && !state?.seeking) || (state && Math.abs(data.time-position(state,data.stamp)) > .5)) cancel(false);
+    if ((data.seeking && !state?.seeking) || (state && Math.abs(data.time-position(state,data.stamp)) > .5)) {
+      cancel(false);
+      if (phase==='error') { phase='idle'; lastError=undefined; io=undefined; }
+    }
   state=data; lastMessage=Date.now();
   if (data.paused || data.seeking) silence();
   else context.resume().catch(() => {});
@@ -200,6 +213,7 @@ function publishStatus() {
     context:context?.state || 'uninitialized', decoding:busy,
     audible:Boolean(context?.state==='running' && timeline?.active),
     paused:Boolean(state.paused), buffering:Boolean(state.buffering),
+    held:Boolean(state.held), videoPaused:Boolean(state.videoPaused),
     bufferedAhead:Math.max(0,cache.frontier(time)-time),
     bufferedBehind:starts.length?Math.max(0,time-Math.min(...starts)):0,
     fetched, lastDecodeMs, lastJobNetworkMs, lastJobOtherMs, error:lastError || '',

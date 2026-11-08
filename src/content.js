@@ -18,6 +18,7 @@
   const contextName = context => ({running:'运行中',suspended:'暂停',closed:'已关闭',uninitialized:'未启动'})[context] || context || '未知';
   function diagnose(d) {
     const error=String(d.error||d.workerLog||'').toLowerCase();
+    if (d.io?.state==='timeout') return ['网络 / 服务器访问','Range 请求超过 20 秒没有响应。解码已中止，视频应保持暂停；检查 Emby 服务器、网络或媒体地址后可尝试重新定位。'];
     if (d.io?.state==='request' && Number(d.io.elapsedMs)>15) return ['网络 / 服务器访问','Range 请求超过 15 秒仍未返回，当前卡在读取媒体数据。可能是网络、Emby 响应或临时媒体地址问题。'];
     if (/range required|http \d|network|fetch|xhr|timeout|range fetch/i.test(error)) return ['网络 / 服务器访问',d.error||d.workerLog];
     if (/wasm|worker|memory|allocation|securityerror|audiocontext/i.test(error) || d.phase==='loading-wasm' || d.context==='closed') return ['本地解码环境',d.error||d.workerLog||'解码器或浏览器音频环境未能启动。'];
@@ -63,6 +64,7 @@
     ui.values.version.textContent=`v${extensionVersion}`;
     ui.values.phase.textContent=phaseName(d.phase);
     ui.values.context.textContent=contextName(d.context);
+    ui.values.sync.textContent=d.held?'等待音频，视频已暂停':d.videoPaused?'视频已暂停':'音视频同步播放';
     ui.values.ahead.textContent=`${Number(d.bufferedAhead || 0).toFixed(1)} 秒`;
     ui.values.behind.textContent=`${Number(d.bufferedBehind || 0).toFixed(1)} 秒`;
     ui.values.decode.textContent=`${Number(d.lastDecodeMs || 0).toFixed(0)} 毫秒`;
@@ -72,7 +74,7 @@
     ui.values.time.textContent=`${Number(d.mediaTime || 0).toFixed(1)} 秒`;
     ui.values.range.textContent=`${Number(d.decodeStart || 0).toFixed(1)} 秒起，取 ${Number(d.decodeDuration || 0).toFixed(0)} 秒`;
     ui.values.pcm.textContent=`${Number(d.pcmSeconds || 0).toFixed(1)} 秒 / ${Number(d.cacheChunks || 0)} 段`;
-    ui.values.io.textContent=d.io ? `${d.io.state==='request'?`等待中 ${Number(d.io.elapsedMs||0).toFixed(1)} 秒`:`已返回 ${Number(d.io.elapsedMs||0).toFixed(0)} ms`}${d.io.status ? ` · HTTP ${d.io.status}` : ''} · ${(Number(d.io.state==='request'?d.io.length:d.io.bytes || 0)/1024/1024).toFixed(1)} MiB` : '尚无请求';
+    ui.values.io.textContent=d.io ? `${d.io.state==='request'?`等待中 ${Number(d.io.elapsedMs||0).toFixed(1)} 秒`:d.io.state==='timeout'?`超时 ${Number(d.io.elapsedMs||0).toFixed(0)} ms`:`已返回 ${Number(d.io.elapsedMs||0).toFixed(0)} ms`}${d.io.status ? ` · HTTP ${d.io.status}` : ''} · ${(Number(d.io.state==='request'?d.io.length:d.io.bytes || 0)/1024/1024).toFixed(1)} MiB` : '尚无请求';
     ui.values.work.textContent=`网络 ${Number(d.lastJobNetworkMs || 0).toFixed(0)} ms；其他 ${Number(d.lastJobOtherMs || 0).toFixed(0)} ms`;
     ui.values.log.textContent=d.workerLog || '尚无解码器日志';
     const [category,evidence]=diagnose(d);
@@ -106,7 +108,7 @@
       .panel{display:none;width:min(340px,calc(100vw - 24px));max-height:min(70vh,560px);overflow:auto;margin-top:7px;padding:12px;border:1px solid #ffffff24;border-radius:10px;background:#202126ed;box-shadow:0 6px 24px #0007;backdrop-filter:blur(12px);pointer-events:auto}
       :host(:hover) .panel,:host([data-open="true"]) .panel{display:block}
       .title{margin:0 0 4px;font-size:13px;font-weight:700}.title [data-v="version"]{margin-left:4px;color:#aaa;font-size:10px;font-weight:500}.hint{margin:0 0 8px;color:#bbb;font-size:11px}.diagnosis{margin:0 0 8px;padding:8px;border-radius:7px;background:#3a3425}.evidence{color:#eee;font-size:11px;line-height:1.45;overflow-wrap:anywhere}.row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:#ddd;border-bottom:1px solid #ffffff12}.row b{color:#fff;font-weight:500;text-align:right;max-width:220px;overflow-wrap:anywhere}.section{margin:10px 0 4px;color:#b6c5d9;font-size:11px;font-weight:700;text-transform:uppercase}.log{margin:0;padding:7px;border-radius:6px;background:#111318;color:#d8d8d8;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.4 ui-monospace,monospace}.error{margin:8px 0 0;padding:7px;border-radius:6px;background:#712f35;color:#ffe2df;overflow-wrap:anywhere}
-    </style><div class="wrap"><button class="badge" type="button" aria-expanded="false"><span class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="label">音频桥接</span></button><div class="panel"><p class="title">音频解码调试 <span data-v="version"></span></p><p class="hint">5 绿：前方缓存 ≥20 秒；4 绿：≥10 秒；3 黄：≥4 秒；2 橙：缓存偏低；1 红：探测或异常。状态每 0.5 秒刷新；点击徽标固定窗口。</p><div class="diagnosis"><div class="row"><span>初步归因</span><b data-v="category"></b></div><div class="evidence" data-v="evidence"></div></div><div class="row"><span>当前状态</span><b data-v="health"></b></div><div class="row"><span>音轨</span><b data-v="codec"></b></div><div class="row"><span>阶段</span><b data-v="phase"></b></div><div class="row"><span>音频输出</span><b data-v="context"></b></div><div class="row"><span>视频时间</span><b data-v="time"></b></div><div class="row"><span>本次解码</span><b data-v="range"></b></div><div class="row"><span>PCM 已产出 / 缓存段</span><b data-v="pcm"></b></div><div class="row"><span>前方已缓存</span><b data-v="ahead"></b></div><div class="row"><span>已播放缓存</span><b data-v="behind"></b></div><div class="row"><span>最近解码耗时</span><b data-v="decode"></b></div><div class="row"><span>媒体读取量</span><b data-v="fetched"></b></div><div class="row"><span>最近 Range 请求</span><b data-v="io"></b></div><div class="row"><span>最近任务耗时</span><b data-v="work"></b></div><p class="section">解码器最近日志</p><pre class="log" data-v="log"></pre><p class="error" data-v="error" hidden></p></div></div>`;
+    </style><div class="wrap"><button class="badge" type="button" aria-expanded="false"><span class="meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><span class="label">音频桥接</span></button><div class="panel"><p class="title">音频解码调试 <span data-v="version"></span></p><p class="hint">5 绿：前方缓存 ≥20 秒；4 绿：≥10 秒；3 黄：≥4 秒；2 橙：缓存偏低；1 红：探测或异常。状态每 0.5 秒刷新；点击徽标固定窗口。</p><div class="diagnosis"><div class="row"><span>初步归因</span><b data-v="category"></b></div><div class="evidence" data-v="evidence"></div></div><div class="row"><span>当前状态</span><b data-v="health"></b></div><div class="row"><span>音轨</span><b data-v="codec"></b></div><div class="row"><span>阶段</span><b data-v="phase"></b></div><div class="row"><span>音频输出</span><b data-v="context"></b></div><div class="row"><span>视频同步</span><b data-v="sync"></b></div><div class="row"><span>视频时间</span><b data-v="time"></b></div><div class="row"><span>本次解码</span><b data-v="range"></b></div><div class="row"><span>PCM 已产出 / 缓存段</span><b data-v="pcm"></b></div><div class="row"><span>前方已缓存</span><b data-v="ahead"></b></div><div class="row"><span>已播放缓存</span><b data-v="behind"></b></div><div class="row"><span>最近解码耗时</span><b data-v="decode"></b></div><div class="row"><span>媒体读取量</span><b data-v="fetched"></b></div><div class="row"><span>最近 Range 请求</span><b data-v="io"></b></div><div class="row"><span>最近任务耗时</span><b data-v="work"></b></div><p class="section">解码器最近日志</p><pre class="log" data-v="log"></pre><p class="error" data-v="error" hidden></p></div></div>`;
     const badge=shadow.querySelector('.badge');
     const values=Object.fromEntries([...shadow.querySelectorAll('[data-v]')].map(node=>[node.dataset.v,node]));
     const button=shadow.querySelector('.badge');
@@ -189,9 +191,16 @@
         if (session.internalPause) session.internalPause = false;
         else session.wanted = false;
       }
+      // Emby or a native control can restart its video element while the audio
+      // bridge is still waiting for decoded PCM. Reassert the hold on every
+      // sync tick so video cannot continue silently during that wait.
+      if (session.buffering && !video.paused && !video.ended && !video.seeking) {
+        session.internalPause=true;
+        video.pause();
+      }
       if (!video.isConnected || source(video) !== url) { close(); return; }
       frame.contentWindow?.postMessage({type:'audio-bridge-state', url,
-        time:video.currentTime, duration:video.duration, buffering:session.buffering, paused:!session.wanted || video.ended || video.seeking || (!session.buffering && video.readyState < 3),
+        time:video.currentTime, duration:video.duration, buffering:session.buffering, held:session.buffering && video.paused, videoPaused:video.paused, paused:!session.wanted || video.ended || video.seeking || (!session.buffering && video.readyState < 3),
         rate:video.playbackRate, volume:video.muted ? 0 : video.volume,
         seeking:video.seeking, stamp:performance.timeOrigin + performance.now()}, extensionOrigin);
     };
@@ -216,7 +225,7 @@
     }
     if (data?.type==='audio-bridge-status') {
       const d=data.status || {};
-      s.status={codec:String(d.codec||'probing').slice(0,24),phase:String(d.phase||'idle').slice(0,32),context:String(d.context||'unknown').slice(0,24),decoding:Boolean(d.decoding),audible:Boolean(d.audible),paused:Boolean(d.paused),buffering:Boolean(d.buffering),bufferedAhead:Number(d.bufferedAhead)||0,bufferedBehind:Number(d.bufferedBehind)||0,lastDecodeMs:Number(d.lastDecodeMs)||0,fetched:Number(d.fetched)||0,error:String(d.error||'').slice(0,180),mediaTime:Number(d.mediaTime)||0,decodeStart:Number(d.decodeStart)||0,decodeDuration:Number(d.decodeDuration)||0,pcmSeconds:Number(d.pcmSeconds)||0,cacheChunks:Number(d.cacheChunks)||0,lastJobNetworkMs:Number(d.lastJobNetworkMs)||0,lastJobOtherMs:Number(d.lastJobOtherMs)||0,io:d.io||null,workerLog:String(d.workerLog||'').slice(0,220)};
+      s.status={codec:String(d.codec||'probing').slice(0,24),phase:String(d.phase||'idle').slice(0,32),context:String(d.context||'unknown').slice(0,24),decoding:Boolean(d.decoding),audible:Boolean(d.audible),paused:Boolean(d.paused),buffering:Boolean(d.buffering),held:Boolean(d.held),videoPaused:Boolean(d.videoPaused),bufferedAhead:Number(d.bufferedAhead)||0,bufferedBehind:Number(d.bufferedBehind)||0,lastDecodeMs:Number(d.lastDecodeMs)||0,fetched:Number(d.fetched)||0,error:String(d.error||'').slice(0,180),mediaTime:Number(d.mediaTime)||0,decodeStart:Number(d.decodeStart)||0,decodeDuration:Number(d.decodeDuration)||0,pcmSeconds:Number(d.pcmSeconds)||0,cacheChunks:Number(d.cacheChunks)||0,lastJobNetworkMs:Number(d.lastJobNetworkMs)||0,lastJobOtherMs:Number(d.lastJobOtherMs)||0,io:d.io||null,workerLog:String(d.workerLog||'').slice(0,220)};
       renderBadge(s);
       return;
     }

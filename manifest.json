@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Emby Audio Bridge",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Local AC3, EAC3 and DTS audio decoding synchronized to the existing Emby video.",
   "icons": {
     "16": "assets/icon16.png",
